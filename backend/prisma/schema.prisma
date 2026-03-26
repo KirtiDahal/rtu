@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String             @id @default(cuid())
+  email            String             @unique
+  passwordHash     String?
+  displayName      String
+  avatarUrl        String?
+  isGuest          Boolean            @default(false)
+  roleLabel        String             @default("Member")
+  refreshTokenHash String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  profile          Profile?
+  cycles           Cycle[]
+  periodLogs       PeriodLog[]
+  moodLogs         MoodLog[]
+  symptomLogs      SymptomLog[]
+  sleepLogs        SleepLog[]
+  messages         CommunityMessage[]
+}
+
+model Profile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  dateOfBirth    DateTime?
+  age            Int?
+  location       String?
+  timezone       String?
+  avgCycleLength Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Cycle {
+  id        String   @id @default(cuid())
+  userId    String
+  startDate DateTime
+  endDate   DateTime?
+  length    Int?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate])
+}
+
+model PeriodLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  flow      Int
+  notes     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model MoodLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  mood      Int
+  label     String
+  notes     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model SymptomLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  symptoms  Json
+  notes     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model SleepLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  hours     Float
+  quality   Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model CommunityChannel {
+  id          String             @id @default(cuid())
+  slug        String             @unique
+  name        String
+  description String
+  memberCount Int                @default(0)
+  createdAt   DateTime           @default(now())
+  messages    CommunityMessage[]
+}
+
+model CommunityMessage {
+  id         String           @id @default(cuid())
+  channelId  String
+  userId     String?
+  senderName String
+  roleLabel  String
+  body       String
+  createdAt  DateTime         @default(now())
+  channel    CommunityChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user       User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([channelId, createdAt])
+}
+
+model KnowledgeArticle {
+  id         String         @id @default(cuid())
+  slug       String         @unique
+  category   String
+  title      String
+  summary    String
+  content    Json
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  tips       KnowledgeTip[]
+}
+
+model KnowledgeTip {
+  id        String            @id @default(cuid())
+  articleId String?
+  title     String
+  body      String
+  theme     String
+  position  Int               @default(0)
+  article   KnowledgeArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@index([articleId, position])
+}
