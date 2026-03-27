@@ -12,7 +12,7 @@ export function KnowledgePage() {
   const [assistantHint, setAssistantHint] = useState("");
   const trimmedSearch = search.trim();
   const effectiveCategory = trimmedSearch ? "All" : category;
-  const { data: articles = [], isFetching: isFetchingArticles } = useQuery({
+  const { data: articles = [] } = useQuery({
     queryKey: ["knowledge-list", effectiveCategory, trimmedSearch],
     queryFn: () => api.knowledge.list({ category: effectiveCategory, search: trimmedSearch })
   });
@@ -72,25 +72,18 @@ export function KnowledgePage() {
       return;
     }
 
-    if (isFetchingArticles) {
-      setAssistantHint("Checking the knowledge base first...");
-      return;
-    }
-
-    if (showFaq) {
-      setAssistantHint("We found FAQ matches. Pick an article from the left panel.");
-      aiMutation.reset();
-      setAssistantQuestion("");
-      setActiveSlug(filtered[0]?.slug ?? "");
-      return;
-    }
-
     if (trimmedSearch.length < 3) {
       setAssistantHint("Please enter at least 3 characters to ask AI.");
       return;
     }
 
-    setAssistantHint("");
+    if (showFaq) {
+      setAssistantHint("FAQ matches found. Generating an AI answer too.");
+      setActiveSlug(filtered[0]?.slug ?? "");
+    } else {
+      setAssistantHint("");
+    }
+
     setAssistantQuestion(trimmedSearch);
     aiMutation.mutate(trimmedSearch);
   }
@@ -98,6 +91,75 @@ export function KnowledgePage() {
   const hasAnswerForCurrentSearch = aiMutation.isSuccess && assistantQuestion === trimmedSearch;
   const hasErrorForCurrentSearch = aiMutation.isError && assistantQuestion === trimmedSearch;
   const isLoadingCurrentSearch = aiMutation.isPending && assistantQuestion === trimmedSearch;
+  const assistantErrorMessage =
+    aiMutation.error instanceof Error
+      ? aiMutation.error.message
+      : "AI assistant could not answer right now. Please try again in a few seconds.";
+  const assistantCard = hasSearchInput ? (
+    <div className="ai-answer-card">
+      <div className="kuromi-chat-header">
+        <div>
+          <h2>Kuromi Companion</h2>
+          <p className="subtitle">Tell me what&apos;s bothering you, and I&apos;ll guide you gently.</p>
+        </div>
+      </div>
+
+      <div className="assistant-chip-row">
+        {quickPrompts.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            className="assistant-chip"
+            onClick={() => {
+              setSearch(prompt);
+              setAssistantHint("Press Enter or Ask AI to send this question.");
+            }}
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+
+      {assistantHint && <p className="knowledge-hint">{assistantHint}</p>}
+
+      {isLoadingCurrentSearch && (
+        <div className="ai-loading" role="status" aria-live="polite">
+          <span className="ai-loading-dot" />
+          <span className="ai-loading-dot" />
+          <span className="ai-loading-dot" />
+          <p>Companion is preparing your answer...</p>
+        </div>
+      )}
+
+      {hasAnswerForCurrentSearch && aiMutation.data ? (
+        <>
+          <p className="subtitle">
+            Answer for: <strong>{assistantQuestion}</strong>
+          </p>
+          <div className="kuromi-thought-layout">
+            <img src={kuromiThinking} alt="Kuromi thinking" className="kuromi-character" />
+            <div className="kuromi-thought-stage">
+              <span className="kuromi-thought-dot dot-one" />
+              <span className="kuromi-thought-dot dot-two" />
+              <div className="kuromi-bubble">
+                <p className="ai-answer-body">{aiMutation.data.answer}</p>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {hasErrorForCurrentSearch ? (
+        <p className="knowledge-hint error">{assistantErrorMessage}</p>
+      ) : null}
+
+      {hasAnswerForCurrentSearch && (
+        <p className="ai-answer-note">
+          Educational guidance only. If symptoms feel severe or unusual, contact a licensed clinician.
+        </p>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div className="knowledge-layout">
@@ -119,7 +181,7 @@ export function KnowledgePage() {
             </button>
           </form>
           <p className="knowledge-search-note">
-            Press Enter or use Ask AI. AI responds only when no FAQ matches your query.
+            Press Enter or use Ask AI. If FAQ matches exist, you&apos;ll see both FAQ and AI guidance.
           </p>
         </header>
         <div className="category-row">
@@ -165,73 +227,10 @@ export function KnowledgePage() {
                     <p>{section.body}</p>
                   </details>
                 ))}
+                {assistantCard}
               </>
             ) : hasSearchInput ? (
-              <div className="ai-answer-card">
-                <div className="kuromi-chat-header">
-                  <div>
-                    <h2>Kuromi Companion</h2>
-                    <p className="subtitle">Tell me what&apos;s bothering you, and I&apos;ll guide you gently.</p>
-                  </div>
-                </div>
-
-                <div className="assistant-chip-row">
-                  {quickPrompts.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      className="assistant-chip"
-                      onClick={() => {
-                        setSearch(prompt);
-                        setAssistantHint("Press Enter or Ask AI to send this question.");
-                      }}
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-
-                {assistantHint && <p className="knowledge-hint">{assistantHint}</p>}
-
-                {isLoadingCurrentSearch && (
-                  <div className="ai-loading" role="status" aria-live="polite">
-                    <span className="ai-loading-dot" />
-                    <span className="ai-loading-dot" />
-                    <span className="ai-loading-dot" />
-                    <p>Companion is preparing your answer...</p>
-                  </div>
-                )}
-
-                {hasAnswerForCurrentSearch && aiMutation.data ? (
-                  <>
-                    <p className="subtitle">
-                      Answer for: <strong>{assistantQuestion}</strong>
-                    </p>
-                    <div className="kuromi-thought-layout">
-                      <img src={kuromiThinking} alt="Kuromi thinking" className="kuromi-character" />
-                      <div className="kuromi-thought-stage">
-                        <span className="kuromi-thought-dot dot-one" />
-                        <span className="kuromi-thought-dot dot-two" />
-                        <div className="kuromi-bubble">
-                          <p className="ai-answer-body">{aiMutation.data.answer}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-
-                {hasErrorForCurrentSearch ? (
-                  <p className="knowledge-hint error">
-                    AI assistant could not answer right now. Please try again in a few seconds.
-                  </p>
-                ) : null}
-
-                {hasAnswerForCurrentSearch && (
-                  <p className="ai-answer-note">
-                    Educational guidance only. If symptoms feel severe or unusual, contact a licensed clinician.
-                  </p>
-                )}
-              </div>
+              assistantCard
             ) : detailQuery.isLoading && showFaq ? (
               <p>Loading article...</p>
             ) : (

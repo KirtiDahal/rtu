@@ -91,6 +91,53 @@ function extractMessageContent(raw: unknown): string {
     .trim();
 }
 
+function stripSentence(value: string, fallback: string): string {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (!trimmed) {
+    return fallback;
+  }
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+export function buildKnowledgeFallbackAnswer(options: {
+  query: string;
+  articles: KnowledgeContextArticle[];
+  modelTag?: string;
+}): KnowledgeAiAnswer {
+  const topArticles = options.articles.slice(0, 2);
+
+  if (topArticles.length === 0) {
+    return {
+      answer: [
+        `I couldn't reach the live AI service just now, but I can still help with "${options.query}".`,
+        "Try tracking recent stress, sleep, exercise, travel, and medication changes, since those can shift cycle timing.",
+        "If your period is repeatedly delayed, very painful, unusually heavy, or you might be pregnant, please contact a licensed clinician."
+      ].join("\n\n"),
+      model: options.modelTag ?? "local-fallback",
+      relatedArticles: []
+    };
+  }
+
+  const details = topArticles.map((article) => {
+    const firstSection = extractSections(article.content)[0];
+    const summary = stripSentence(article.summary, "This article shares practical cycle guidance.");
+    const sectionLine = firstSection
+      ? ` ${stripSentence(firstSection.body, "It includes practical self-care tips.")}`
+      : "";
+    return `${article.title}: ${summary}${sectionLine}`;
+  });
+
+  return {
+    answer: [
+      "The live AI service is temporarily unavailable, so here is guidance from the app knowledge base:",
+      details.join("\n"),
+      "Use this as educational support, and seek medical care for severe, unusual, or worsening symptoms."
+    ].join("\n\n"),
+    model: options.modelTag ?? "local-fallback",
+    relatedArticles: topArticles.map((article) => ({ slug: article.slug, title: article.title }))
+  };
+}
+
 export async function askKnowledgeAi(options: AskKnowledgeAiOptions): Promise<KnowledgeAiAnswer> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);

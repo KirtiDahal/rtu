@@ -281,11 +281,13 @@ describe("domain integration", () => {
     expect(detail.body.content).toBeTruthy();
   });
 
-  it("returns a clear error when AI assistant is not configured", async () => {
+  it("returns an answer payload from the AI assistant endpoint", async () => {
     const cookies = await loginAsDemoUser();
     const ai = await request(app).post("/knowledge/ask").set("Cookie", cookies).send({ query: "What is PMDD?" });
-    expect(ai.status).toBe(503);
-    expect(ai.body.message).toContain("not configured");
+    expect(ai.status).toBe(200);
+    expect(typeof ai.body.answer).toBe("string");
+    expect(ai.body.answer.length).toBeGreaterThan(0);
+    expect(typeof ai.body.model).toBe("string");
   });
 });
 

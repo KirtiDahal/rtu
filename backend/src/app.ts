@@ -20,7 +20,7 @@ import { requireAdmin, requireAuth } from "./middleware.js";
 import { computeCyclePrediction } from "./prediction.js";
 import { serializeMessage, serializeUser } from "./serializers.js";
 import { getIoInstance } from "./socket.js";
-import { askKnowledgeAi } from "./knowledge-ai.js";
+import { askKnowledgeAi, buildKnowledgeFallbackAnswer } from "./knowledge-ai.js";
 import { ROLE_ADMIN, ROLE_GUEST, ROLE_MEMBER } from "./roles.js";
 
 const registerSchema = z.object({
@@ -910,11 +910,6 @@ export function createApp() {
       return;
     }
 
-    if (!env.OPENROUTER_API_KEY) {
-      response.status(503).json({ message: "AI assistant is not configured on the server" });
-      return;
-    }
-
     const query = payload.data.query;
     const relatedArticles = await prisma.knowledgeArticle.findMany({
       where: {
@@ -930,6 +925,17 @@ export function createApp() {
       orderBy: { updatedAt: "desc" }
     });
 
+    if (!env.OPENROUTER_API_KEY) {
+      response.json(
+        buildKnowledgeFallbackAnswer({
+          query,
+          articles: relatedArticles,
+          modelTag: "local-fallback-no-api-key"
+        })
+      );
+      return;
+    }
+
     try {
       const aiResponse = await askKnowledgeAi({
         apiKey: env.OPENROUTER_API_KEY,
@@ -944,7 +950,13 @@ export function createApp() {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error(error);
-      response.status(502).json({ message: "AI assistant failed to respond. Please try again." });
+      response.json(
+        buildKnowledgeFallbackAnswer({
+          query,
+          articles: relatedArticles,
+          modelTag: "local-fallback-provider-error"
+        })
+      );
     }
   });
 

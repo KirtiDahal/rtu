@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KnowledgePage } from "../pages/KnowledgePage";
 import { renderWithProviders } from "./render";
 
@@ -42,6 +42,10 @@ vi.mock("../lib/api", () => ({
 }));
 
 describe("KnowledgePage", () => {
+  beforeEach(() => {
+    askMock.mockClear();
+  });
+
   it("filters articles by search text", async () => {
     renderWithProviders(<KnowledgePage />);
     expect(await screen.findByText("Menstrual Cycle 101")).toBeInTheDocument();
@@ -62,5 +66,16 @@ describe("KnowledgePage", () => {
     expect(await screen.findByText("Kuromi Companion")).toBeInTheDocument();
     expect(await screen.findByText("AI fallback answer")).toBeInTheDocument();
     expect(askMock).toHaveBeenCalledWith("unlisted query");
+  });
+
+  it("asks AI even when FAQ matches exist", async () => {
+    renderWithProviders(<KnowledgePage />);
+    fireEvent.change(await screen.findByPlaceholderText(/Search for luteal phase/i), {
+      target: { value: "menstrual" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Ask AI/i }));
+
+    expect(await screen.findByText("AI fallback answer")).toBeInTheDocument();
+    expect(askMock).toHaveBeenCalledWith("menstrual");
   });
 });
